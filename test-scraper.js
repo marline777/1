@@ -1,5 +1,5 @@
 // Test the modern scraper functionality
-const fetch = require('node-fetch');
+import fetch from 'node-fetch';
 
 async function testScrapingWorkflow() {
   try {
