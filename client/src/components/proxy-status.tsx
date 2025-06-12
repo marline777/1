@@ -1,4 +1,4 @@
-import { Github, RefreshCw } from "lucide-react";
+import { Github, RefreshCw, Shield } from "lucide-react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -32,6 +32,24 @@ export default function ProxyStatus({ proxyStats }: ProxyStatusProps) {
     onError: (error: Error) => {
       toast({
         title: "Sync Failed",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
+  });
+
+  const syncReplitValidatorMutation = useMutation({
+    mutationFn: () => apiRequest("POST", "/api/proxies/sync-replit"),
+    onSuccess: (response) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/proxies/stats"] });
+      toast({
+        title: "Replit Validator Connected",
+        description: `Successfully validated and synced ${response.synced} proxies from CodeValidator.`,
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Validator Connection Failed",
         description: error.message,
         variant: "destructive"
       });
@@ -84,14 +102,33 @@ export default function ProxyStatus({ proxyStats }: ProxyStatusProps) {
             onClick={() => syncProxiesMutation.mutate()}
             disabled={syncProxiesMutation.isPending}
             variant="outline"
-            className="w-full font-medium"
+            className="w-full font-medium mb-3"
           >
             {syncProxiesMutation.isPending ? (
               <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
             ) : (
               <Github className="mr-2 h-4 w-4" />
             )}
-            Sync Proxy List
+            Sync GitHub Proxies
+          </Button>
+
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm font-medium text-gray-900 dark:text-white">Replit Validator</span>
+            <Badge variant="outline" className="text-xs">Available</Badge>
+          </div>
+          <p className="text-xs text-gray-600 dark:text-gray-400 mb-3">CodeValidator-1.mcgmarline.repl.co</p>
+          <Button
+            onClick={() => syncReplitValidatorMutation.mutate()}
+            disabled={syncReplitValidatorMutation.isPending}
+            variant="outline"
+            className="w-full font-medium"
+          >
+            {syncReplitValidatorMutation.isPending ? (
+              <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <Shield className="mr-2 h-4 w-4" />
+            )}
+            Connect CodeValidator
           </Button>
         </div>
       </CardContent>

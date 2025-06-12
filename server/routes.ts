@@ -215,6 +215,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/proxies/sync-replit", async (req, res) => {
+    try {
+      const syncResult = await proxyManager.syncFromReplitValidator();
+      
+      // Emit real-time update
+      io.emit("proxies_synced", syncResult);
+      
+      res.json(syncResult);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to sync proxies from Replit validator" });
+    }
+  });
+
   app.get("/api/proxies/stats", async (req, res) => {
     try {
       const stats = await storage.getProxyStats();
