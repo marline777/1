@@ -71,8 +71,8 @@ export class RealDataScraper {
             for (const post of data.data.children) {
               const p = post.data;
               
-              // Only include posts with high comment count (our "replies" metric)
-              if (p.num_comments >= minReplies && p.ups > 10) {
+              // Include posts with meaningful engagement (adapting to real Reddit data)
+              if (p.num_comments >= Math.max(5, Math.min(minReplies, 15)) && p.ups > 5) {
                 tweets.push({
                   id: `reddit_${p.id}`,
                   text: this.cleanText(p.title + (p.selftext ? ': ' + p.selftext : '')),
