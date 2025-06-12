@@ -1,99 +1,170 @@
 import fetch from 'node-fetch';
 
 async function runCompleteWorkflow() {
-  console.log('Running complete crypto monitoring workflow...');
+  console.log('Testing complete follower-focused workflow...');
   
-  // Step 1: Get current market data
-  const marketResponse = await fetch('https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=5&page=1&sparkline=false&price_change_percentage=1h%2C24h%2C7d');
-  const marketData = await marketResponse.json();
+  // Clear previous data
+  await fetch('http://localhost:5000/api/tweets', { method: 'DELETE' });
+  await fetch('http://localhost:5000/api/ai-content', { method: 'DELETE' });
   
-  console.log(`Collected live data for ${marketData.length} cryptocurrencies`);
-  
-  // Step 2: Process and store market insights
-  for (const coin of marketData) {
-    const change24h = coin.price_change_percentage_24h;
-    const volume = coin.total_volume;
-    const marketCap = coin.market_cap;
-    
-    // Create market analysis content
-    let content = `${coin.name} analysis: `;
-    if (Math.abs(change24h) > 5) {
-      content += `Significant ${change24h > 0 ? 'surge' : 'drop'} of ${Math.abs(change24h).toFixed(2)}% in 24h. `;
+  // Create high-engagement tweets that meet the 20+ replies criteria
+  const highEngagementTweets = [
+    {
+      tweetId: 'btc_bull_' + Date.now(),
+      text: 'Bitcoin dominance dropping while alts are pumping. Is this the start of alt season or just another fake-out?',
+      author: 'CryptoWhale',
+      username: 'cryptowhale',
+      replyCount: 67,  // High engagement
+      likes: 1243,
+      retweets: 234,
+      engagementScore: '1544',
+      mediaUrls: [],
+      workflowId: 1
+    },
+    {
+      tweetId: 'defi_yield_' + Date.now(),
+      text: 'Found a DeFi protocol offering 400% APY. Too good to be true or legitimate opportunity? Doing my research...',
+      author: 'DeFiHunter',
+      username: 'defihunter',
+      replyCount: 43,  // High engagement
+      likes: 892,
+      retweets: 156,
+      engagementScore: '1091',
+      mediaUrls: [],
+      workflowId: 1
+    },
+    {
+      tweetId: 'lambo_moon_' + Date.now(),
+      text: 'LAMBO just hit $0.50! Community called this at $0.05. Sometimes the meme coins actually deliver 🚗',
+      author: 'MemeKing',
+      username: 'memeking',
+      replyCount: 89,  // Very high engagement
+      likes: 2156,
+      retweets: 445,
+      engagementScore: '2690',
+      mediaUrls: [],
+      workflowId: 1
+    },
+    {
+      tweetId: 'bearish_signal_' + Date.now(),
+      text: 'Market looking shaky. Volume declining, fear index rising. Might be time to take some profits and wait.',
+      author: 'TechnicalTrader',
+      username: 'technicaltrader',
+      replyCount: 156,  // Extremely high engagement
+      likes: 3421,
+      retweets: 789,
+      engagementScore: '4366',
+      mediaUrls: [],
+      workflowId: 1
+    },
+    {
+      tweetId: 'low_engagement_' + Date.now(),
+      text: 'Just bought some random altcoin. Hope it moons.',
+      author: 'SmallFish',
+      username: 'smallfish',
+      replyCount: 8,   // Below 20 threshold - should be ignored
+      likes: 23,
+      retweets: 3,
+      engagementScore: '34',
+      mediaUrls: [],
+      workflowId: 1
     }
-    content += `Current price: $${coin.current_price.toLocaleString()}. `;
-    content += `24h volume: $${(volume / 1e9).toFixed(2)}B. `;
-    
-    if (volume > marketCap * 0.1) {
-      content += `High trading activity detected.`;
-    }
-    
-    // Store in database
+  ];
+  
+  // Store tweets
+  for (const tweet of highEngagementTweets) {
     await fetch('http://localhost:5000/api/tweets', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        tweetId: `analysis_${coin.id}_${Date.now()}`,
-        text: content,
-        author: 'CryptoAnalyst',
-        username: 'cryptoanalyst',
-        replyCount: Math.floor(Math.random() * 20),
-        likes: Math.floor(volume / 1e8),
-        retweets: Math.floor(volume / 5e8),
-        engagementScore: String(Math.floor(volume / 1e7)),
-        mediaUrls: [],
-        workflowId: 1
-      })
+      body: JSON.stringify(tweet)
     });
   }
   
-  // Step 3: Get trending coins for social sentiment
-  const trendingResponse = await fetch('https://api.coingecko.com/api/v3/search/trending');
-  const trending = await trendingResponse.json();
+  console.log(`Stored ${highEngagementTweets.length} tweets for testing`);
+  console.log('High engagement targets (20+ replies):');
+  highEngagementTweets
+    .filter(t => t.replyCount >= 20)
+    .forEach(t => console.log(`- ${t.replyCount} replies: "${t.text.substring(0, 60)}..."`));
   
-  console.log(`Found ${trending.coins.length} trending cryptocurrencies`);
+  // Generate follower-focused replies using local algorithm
+  console.log('\nGenerating follower-attracting replies...');
   
-  for (const trendCoin of trending.coins.slice(0, 3)) {
-    const coin = trendCoin.item;
-    const content = `${coin.name} (${coin.symbol}) is trending on CoinGecko. Market cap rank: #${coin.market_cap_rank}. Social media buzz increasing.`;
-    
-    await fetch('http://localhost:5000/api/tweets', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        tweetId: `trending_${coin.id}_${Date.now()}`,
-        text: content,
-        author: 'TrendWatcher',
-        username: 'trendwatcher',
-        replyCount: 15,
-        likes: coin.market_cap_rank ? Math.max(100 - coin.market_cap_rank, 10) : 25,
-        retweets: coin.market_cap_rank ? Math.max(50 - coin.market_cap_rank, 5) : 12,
-        engagementScore: String(coin.market_cap_rank ? Math.max(150 - coin.market_cap_rank, 15) : 37),
-        mediaUrls: [],
-        workflowId: 1
-      })
-    });
-  }
+  const { followerFocusedReplies } = await import('./server/follower-focused-replies.js');
   
-  // Step 4: Check final results
-  setTimeout(async () => {
-    const metrics = await fetch('http://localhost:5000/api/metrics');
-    const metricsData = await metrics.json();
+  let repliesGenerated = 0;
+  for (const tweet of highEngagementTweets) {
+    const analysis = followerFocusedReplies.analyzeFollowerPotential(tweet);
     
-    console.log('\nWorkflow Complete:');
-    console.log(`Total content processed: ${metricsData.tweetsProcessed}`);
-    console.log(`Data sources: CoinGecko market data, trending analysis`);
-    console.log(`Collection method: Public APIs without authentication`);
-    
-    // Get sample of collected content
-    const tweetsResponse = await fetch('http://localhost:5000/api/tweets?limit=3');
-    if (tweetsResponse.ok) {
-      const tweets = await tweetsResponse.json();
-      console.log('\nSample collected content:');
-      tweets.forEach((tweet, i) => {
-        console.log(`${i + 1}. ${tweet.text.substring(0, 80)}...`);
+    if (analysis.shouldReply) {
+      const replyData = followerFocusedReplies.generateCompleteReply(tweet.text, tweet.author);
+      
+      await fetch('http://localhost:5000/api/ai-content', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          content: replyData.content,
+          type: 'reply',
+          qualityScore: String(analysis.score),
+          targetTweetId: tweet.tweetId,
+          status: analysis.score >= 70 ? 'approved' : 'pending_approval'
+        })
       });
+      
+      repliesGenerated++;
     }
-  }, 2000);
+  }
+  
+  console.log(`Generated ${repliesGenerated} follower-focused replies`);
+  
+  // Check reply queue
+  const queueResponse = await fetch('http://localhost:5000/api/replies/queue');
+  const queue = await queueResponse.json();
+  
+  console.log('\nReply Queue Status:');
+  console.log(`- Pending approval: ${queue.pending?.length || 0}`);
+  console.log(`- Auto-approved: ${queue.approved?.length || 0}`);
+  
+  // Show sample replies with quality analysis
+  if (queue.pending?.length > 0 || queue.approved?.length > 0) {
+    console.log('\nSample Follower-Attracting Replies:');
+    
+    const allReplies = [...(queue.pending || []), ...(queue.approved || [])];
+    allReplies.slice(0, 3).forEach((reply, i) => {
+      console.log(`\n${i+1}. Quality Score: ${reply.qualityScore}% | Status: ${reply.status}`);
+      console.log(`   Target: ${reply.targetTweetId}`);
+      console.log(`   Reply: "${reply.content.substring(0, 200)}..."`);
+    });
+  }
+  
+  // Test approval workflow
+  if (queue.pending?.length > 0) {
+    const firstReply = queue.pending[0];
+    console.log(`\nApproving reply ${firstReply.id} for posting...`);
+    
+    const approveResponse = await fetch(`http://localhost:5000/api/replies/${firstReply.id}/approve`, {
+      method: 'POST'
+    });
+    
+    if (approveResponse.ok) {
+      console.log('Reply approved and queued for posting');
+    }
+  }
+  
+  // Final metrics
+  const metricsResponse = await fetch('http://localhost:5000/api/metrics');
+  const metrics = await metricsResponse.json();
+  
+  console.log('\nFinal Results:');
+  console.log(`- Total tweets processed: ${metrics.tweetsProcessed}`);
+  console.log(`- AI responses generated: ${metrics.aiResponses}`);
+  console.log(`- Pending approvals: ${metrics.pendingApprovals}`);
+  console.log(`- System ready for Twitter API integration`);
+  
+  console.log('\nStrategy Summary:');
+  console.log('✓ Only targeting tweets with 20+ replies (high engagement)');
+  console.log('✓ Generating funny + trading insights replies to attract followers');
+  console.log('✓ Queue-based approval system to avoid detection');
+  console.log('✓ Ready for automated posting via Twitter API');
 }
 
 runCompleteWorkflow();

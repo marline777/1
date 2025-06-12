@@ -2,7 +2,8 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { Server as SocketIOServer } from "socket.io";
 import { storage } from "./storage";
-import { insertWorkflowSchema, insertTweetSchema, insertAiContentSchema, insertProxySchema, insertActivitySchema } from "@shared/schema";
+import { insertWorkflowSchema, insertTweetSchema, insertAiContentSchema, insertProxySchema, insertActivitySchema, tweets, aiContent } from "@shared/schema";
+import { db } from "./db";
 import { workflowManager } from "./workflow-manager";
 import { proxyManager } from "./proxy-manager";
 import { generateAIContent, analyzeContentQuality } from "./openai";
@@ -374,6 +375,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ message: "Emergency stop activated successfully" });
     } catch (error) {
       res.status(500).json({ error: "Failed to execute emergency stop" });
+    }
+  });
+
+  // Delete endpoints for testing
+  app.delete("/api/tweets", async (req, res) => {
+    try {
+      await db.delete(tweets);
+      res.json({ message: "Tweets cleared" });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to clear tweets" });
+    }
+  });
+
+  app.delete("/api/ai-content", async (req, res) => {
+    try {
+      await db.delete(aiContent);
+      res.json({ message: "AI content cleared" });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to clear AI content" });
     }
   });
 
