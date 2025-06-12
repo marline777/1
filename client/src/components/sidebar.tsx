@@ -1,15 +1,18 @@
 import { Bot, Play, Network, Brain, BarChart3, Shield, Settings, Gauge } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Link, useLocation } from "wouter";
 
 export default function Sidebar() {
+  const [location] = useLocation();
+  
   const menuItems = [
-    { icon: Gauge, label: "Dashboard", active: true, href: "#" },
-    { icon: Play, label: "Workflows", href: "#", badge: { text: "3 Active", variant: "success" as const } },
-    { icon: Network, label: "Proxy Management", href: "#" },
-    { icon: Brain, label: "AI Content", href: "#" },
-    { icon: BarChart3, label: "Analytics", href: "#" },
-    { icon: Shield, label: "Safety Controls", href: "#" },
-    { icon: Settings, label: "Settings", href: "#" }
+    { icon: Gauge, label: "Dashboard", href: "/dashboard" },
+    { icon: Play, label: "Workflows", href: "/workflows", badge: { text: "3 Active", variant: "success" as const } },
+    { icon: Network, label: "Proxy Management", href: "/proxies" },
+    { icon: Brain, label: "AI Content", href: "/ai-content" },
+    { icon: BarChart3, label: "Analytics", href: "/analytics" },
+    { icon: Shield, label: "Safety Controls", href: "/safety" },
+    { icon: Settings, label: "Settings", href: "/settings" }
   ];
 
   return (
@@ -30,10 +33,10 @@ export default function Sidebar() {
         <ul className="space-y-2">
           {menuItems.map((item) => (
             <li key={item.label}>
-              <a
+              <Link
                 href={item.href}
                 className={`flex items-center space-x-3 px-4 py-3 rounded-lg font-medium transition-colors ${
-                  item.active
+                  location === item.href
                     ? "bg-primary/10 text-primary"
                     : "text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
                 }`}
@@ -48,7 +51,7 @@ export default function Sidebar() {
                     {item.badge.text}
                   </Badge>
                 )}
-              </a>
+              </Link>
             </li>
           ))}
         </ul>
