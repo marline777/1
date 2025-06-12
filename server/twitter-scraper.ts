@@ -142,30 +142,33 @@ export class TwitterScraper {
           workflowId: 1
         });
 
-        // Generate AI reply
-        const aiReply = await generateAIContent(tweet.text, "reply");
+        // Generate follower-focused reply using local algorithm
+        const { followerFocusedReplies } = await import("./follower-focused-replies");
+        const analysis = followerFocusedReplies.analyzeFollowerPotential(tweet);
         
-        // Analyze quality
-        const qualityAnalysis = await analyzeContentQuality(aiReply.content);
-
-        // Store AI reply for manual approval or automatic posting
-        await storage.createAIContent({
-          content: aiReply.content,
-          type: 'reply',
-          qualityScore: qualityAnalysis.score,
-          targetTweetId: tweet.id,
-          status: qualityAnalysis.score >= 80 ? 'approved' : 'pending_approval'
-        });
+        if (analysis.shouldReply) {
+          const replyData = followerFocusedReplies.generateCompleteReply(tweet.text, tweet.author);
+          
+          // Store reply for approval
+          await storage.createAIContent({
+            content: replyData.content,
+            type: 'reply',
+            qualityScore: String(analysis.score),
+            targetTweetId: tweet.id,
+            status: analysis.score >= 70 ? 'approved' : 'pending_approval'
+          });
+        }
 
         await storage.logActivity({
           type: "ai_reply_generated",
-          message: `Generated reply for trending tweet (${tweet.engagement.likes} likes)`,
+          message: `Generated follower-focused reply for trending tweet (${tweet.engagement.likes} likes)`,
           status: "success",
           workflowId: 1,
           metadata: { 
             originalTweetId: tweet.id,
-            qualityScore: qualityAnalysis.score,
-            engagement: tweet.engagement.likes
+            qualityScore: analysis.score,
+            engagement: tweet.engagement.likes,
+            replyType: 'follower_focused'
           }
         });
 
