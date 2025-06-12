@@ -282,6 +282,81 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Reply management endpoints
+  app.get("/api/replies/queue", async (req, res) => {
+    try {
+      const { replyManager } = await import("./reply-manager");
+      const queue = await replyManager.getReplyQueue();
+      res.json(queue);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch reply queue" });
+    }
+  });
+
+  app.post("/api/replies/:id/approve", async (req, res) => {
+    try {
+      const { replyManager } = await import("./reply-manager");
+      await replyManager.approveReply(parseInt(req.params.id));
+      res.json({ message: "Reply approved" });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to approve reply" });
+    }
+  });
+
+  app.post("/api/replies/:id/reject", async (req, res) => {
+    try {
+      const { replyManager } = await import("./reply-manager");
+      const { reason } = req.body;
+      await replyManager.rejectReply(parseInt(req.params.id), reason);
+      res.json({ message: "Reply rejected" });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to reject reply" });
+    }
+  });
+
+  app.post("/api/replies/execute", async (req, res) => {
+    try {
+      const { replyManager } = await import("./reply-manager");
+      await replyManager.executeApprovedReplies();
+      res.json({ message: "Approved replies executed" });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to execute replies" });
+    }
+  });
+
+  app.get("/api/trending/keywords", async (req, res) => {
+    try {
+      const { trendingKeywordFinder } = await import("./trending-keywords");
+      const keywords = await trendingKeywordFinder.findTrendingCryptoKeywords();
+      res.json(keywords);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch trending keywords" });
+    }
+  });
+
+  app.post("/api/trending/scrape", async (req, res) => {
+    try {
+      const { twitterScraper } = await import("./twitter-scraper");
+      const { trendingKeywordFinder } = await import("./trending-keywords");
+      
+      // Get dynamic trending keywords
+      const trendingKeywords = await trendingKeywordFinder.getTopKeywordsForScraping(8);
+      const { minEngagement } = req.body;
+      
+      await twitterScraper.executeTrendingWorkflow(
+        trendingKeywords, 
+        minEngagement || 150
+      );
+      
+      res.json({ 
+        message: "Trending scrape completed",
+        keywords: trendingKeywords
+      });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to execute trending scrape" });
+    }
+  });
+
   // Emergency stop endpoint
   app.post("/api/emergency-stop", async (req, res) => {
     try {
