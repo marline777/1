@@ -337,24 +337,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/trending/scrape", async (req, res) => {
     try {
-      const { twitterScraper } = await import("./twitter-scraper");
+      const { realDataScraper } = await import("./real-data-scraper");
       const { trendingKeywordFinder } = await import("./trending-keywords");
       
       // Get dynamic trending keywords
       const trendingKeywords = await trendingKeywordFinder.getTopKeywordsForScraping(8);
       const { minEngagement } = req.body;
       
-      await twitterScraper.executeTrendingWorkflow(
+      await realDataScraper.executeRealWorkflow(
         trendingKeywords, 
-        minEngagement || 150
+        minEngagement || 20
       );
       
       res.json({ 
-        message: "Trending scrape completed",
+        message: "Real data collection completed",
         keywords: trendingKeywords
       });
     } catch (error) {
-      res.status(500).json({ error: "Failed to execute trending scrape" });
+      res.status(500).json({ error: "Failed to execute real data collection" });
     }
   });
 
