@@ -43,7 +43,7 @@ export default function MetricsGrid({ metrics }: MetricsGridProps) {
     },
     {
       title: "Proxy Success Rate",
-      value: `${data.proxySuccessRate.toFixed(1)}%`,
+      value: `${(typeof data.proxySuccessRate === 'string' ? parseFloat(data.proxySuccessRate) : data.proxySuccessRate).toFixed(1)}%`,
       change: "Excellent performance",
       icon: Network,
       iconBg: "bg-green-500/10",
