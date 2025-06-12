@@ -65,7 +65,7 @@ export default function ProxyStatus({ proxyStats }: ProxyStatusProps) {
         
         <div className="grid grid-cols-2 gap-4 mt-4">
           <div className="text-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-            <p className="text-2xl font-bold text-green-600">{stats.successRate.toFixed(1)}%</p>
+            <p className="text-2xl font-bold text-green-600">{(typeof stats.successRate === 'string' ? parseFloat(stats.successRate) : stats.successRate).toFixed(1)}%</p>
             <p className="text-xs text-gray-600 dark:text-gray-400">Success Rate</p>
           </div>
           <div className="text-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">

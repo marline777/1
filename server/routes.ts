@@ -260,6 +260,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Proxy synchronization endpoint
+  app.post("/api/proxies/sync", async (req, res) => {
+    try {
+      await proxyManager.syncFromGitHub();
+      const stats = await storage.getProxyStats();
+      
+      // Emit real-time update
+      io.emit("proxies_synced", stats);
+      
+      res.json({ 
+        message: "Proxy sync completed successfully", 
+        stats 
+      });
+    } catch (error) {
+      console.error("Error syncing proxies:", error);
+      res.status(500).json({ 
+        message: "Failed to sync proxies from GitHub",
+        error: (error as Error).message 
+      });
+    }
+  });
+
   // Emergency stop endpoint
   app.post("/api/emergency-stop", async (req, res) => {
     try {
