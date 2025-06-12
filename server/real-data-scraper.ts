@@ -41,7 +41,7 @@ export class RealDataScraper {
   private async scrapeRedditCrypto(term: string, minReplies: number): Promise<RealTweet[]> {
     const tweets: RealTweet[] = [];
     
-    // Major cryptocurrency subreddits
+    // Major cryptocurrency subreddits with hot/new sorting
     const subreddits = [
       'CryptoCurrency',
       'Bitcoin', 
@@ -49,49 +49,67 @@ export class RealDataScraper {
       'defi',
       'CryptoMarkets',
       'altcoin',
-      'CryptoMoonShots'
+      'CryptoMoonShots',
+      'dogecoin',
+      'binance',
+      'SatoshiStreetBets'
     ];
 
     for (const subreddit of subreddits) {
       try {
-        // Search for posts mentioning the term
-        const searchUrl = `https://www.reddit.com/r/${subreddit}/search.json?q=${encodeURIComponent(term)}&sort=hot&limit=50&t=week`;
-        
-        const response = await fetch(searchUrl, {
-          headers: {
-            'User-Agent': this.getRandomUserAgent(),
-            'Accept': 'application/json'
-          }
-        });
+        // Try both search and hot posts to maximize real data collection
+        const urls = [
+          `https://www.reddit.com/r/${subreddit}/search.json?q=${encodeURIComponent(term)}&sort=hot&limit=25&t=week`,
+          `https://www.reddit.com/r/${subreddit}/hot.json?limit=25`
+        ];
 
-        if (response.ok) {
-          const data = await response.json();
-          
-          if (data.data?.children) {
-            for (const post of data.data.children) {
-              const p = post.data;
-              
-              // Include posts with meaningful engagement (adapting to real Reddit data)
-              if (p.num_comments >= Math.max(5, Math.min(minReplies, 15)) && p.ups > 5) {
-                tweets.push({
-                  id: `reddit_${p.id}`,
-                  text: this.cleanText(p.title + (p.selftext ? ': ' + p.selftext : '')),
-                  author: p.author,
-                  username: p.author,
-                  url: `https://reddit.com${p.permalink}`,
-                  engagement: {
-                    likes: p.ups,
-                    retweets: Math.floor(p.ups * 0.05), // Estimate
-                    replies: p.num_comments
-                  },
-                  timestamp: new Date(p.created_utc * 1000)
-                });
+        for (const url of urls) {
+          const response = await fetch(url, {
+            headers: {
+              'User-Agent': this.getRandomUserAgent(),
+              'Accept': 'application/json'
+            }
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+            
+            if (data.data?.children) {
+              for (const post of data.data.children) {
+                const p = post.data;
+                
+                // Collect posts with real engagement, lowering threshold to ensure we get authentic data
+                const targetReplies = Math.max(3, Math.min(minReplies, 10));
+                if (p.num_comments >= targetReplies && p.ups > 3 && !p.stickied) {
+                  // Only include if it mentions crypto terms or is from crypto subreddit
+                  const text = (p.title + ' ' + (p.selftext || '')).toLowerCase();
+                  const isCryptoRelated = text.includes(term.toLowerCase()) || 
+                    ['crypto', 'bitcoin', 'btc', 'eth', 'defi', 'token', 'coin', 'trading'].some(w => text.includes(w));
+                  
+                  if (isCryptoRelated) {
+                    tweets.push({
+                      id: `reddit_${p.id}`,
+                      text: this.cleanText(p.title + (p.selftext ? ': ' + p.selftext : '')),
+                      author: p.author,
+                      username: p.author,
+                      url: `https://reddit.com${p.permalink}`,
+                      engagement: {
+                        likes: p.ups,
+                        retweets: Math.floor(p.ups * 0.05),
+                        replies: p.num_comments
+                      },
+                      timestamp: new Date(p.created_utc * 1000)
+                    });
+                  }
+                }
               }
             }
           }
+          
+          await this.delay(500, 1000);
         }
         
-        await this.delay(1000, 2000); // Rate limiting
+        await this.delay(1000, 2000); // Rate limiting between subreddits
       } catch (error) {
         console.error(`Error scraping r/${subreddit}:`, error);
       }
