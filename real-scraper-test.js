@@ -1,101 +1,105 @@
 import fetch from 'node-fetch';
 
 async function testRealScraping() {
-  console.log('Testing REAL scraping without demo content...');
+  console.log('Running follower-focused system with live crypto data...');
   
-  // Test Reddit cryptocurrency subreddit
-  try {
-    console.log('Scraping Reddit r/cryptocurrency...');
-    const redditResponse = await fetch('https://www.reddit.com/r/cryptocurrency/new.json?limit=25', {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-      }
+  // Clear existing data
+  await fetch('http://localhost:5000/api/tweets', { method: 'DELETE' });
+  await fetch('http://localhost:5000/api/ai-content', { method: 'DELETE' });
+  
+  // Get real trending keywords from live APIs
+  const keywordsResponse = await fetch('http://localhost:5000/api/trending/keywords');
+  const keywords = await keywordsResponse.json();
+  
+  console.log(`\nLive Trending Keywords (${keywords.length} found):`);
+  keywords.slice(0, 8).forEach((k, i) => {
+    console.log(`${i+1}. ${k.keyword.toUpperCase()} - Volume: ${k.volume}, Growth: ${k.growth.toFixed(1)}%, Sentiment: ${k.sentiment}`);
+  });
+  
+  // Execute real scraping workflow with trending keywords
+  console.log('\nStarting real scraping with 20+ replies targeting...');
+  const scrapeResponse = await fetch('http://localhost:5000/api/trending/scrape', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      minEngagement: 20 // Target tweets with at least 20 replies
+    })
+  });
+  
+  const scrapeResult = await scrapeResponse.json();
+  console.log(`Targeting keywords: ${scrapeResult.keywords?.join(', ')}`);
+  
+  // Wait for the scraping to process
+  console.log('Processing tweets and generating follower-attracting replies...');
+  await new Promise(resolve => setTimeout(resolve, 5000));
+  
+  // Check what was found and processed
+  const metricsResponse = await fetch('http://localhost:5000/api/metrics');
+  const metrics = await metricsResponse.json();
+  
+  console.log(`\nProcessing Results:`);
+  console.log(`- Tweets processed: ${metrics.tweetsProcessed}`);
+  console.log(`- AI responses generated: ${metrics.aiResponses}`);
+  console.log(`- Pending approvals: ${metrics.pendingApprovals}`);
+  
+  // Check the reply queue
+  const queueResponse = await fetch('http://localhost:5000/api/replies/queue');
+  const queue = await queueResponse.json();
+  
+  console.log(`\nReply Queue Status:`);
+  console.log(`- Pending approval: ${queue.pending?.length || 0}`);
+  console.log(`- Auto-approved: ${queue.approved?.length || 0}`);
+  
+  // Show generated replies
+  const allReplies = [...(queue.pending || []), ...(queue.approved || [])];
+  if (allReplies.length > 0) {
+    console.log('\nGenerated Follower-Attracting Replies:');
+    allReplies.forEach((reply, i) => {
+      console.log(`\n${i+1}. Quality Score: ${reply.qualityScore}% | Status: ${reply.status}`);
+      console.log(`   Target Tweet: ${reply.targetTweetId}`);
+      console.log(`   Reply: "${reply.content}"`);
     });
     
-    if (redditResponse.ok) {
-      const redditData = await redditResponse.json();
-      console.log(`Found ${redditData.data.children.length} posts on Reddit`);
+    // Approve the best reply for demonstration
+    if (queue.pending?.length > 0) {
+      const bestReply = queue.pending[0];
+      console.log(`\nApproving reply ${bestReply.id} for posting queue...`);
       
-      // Process actual Reddit posts
-      const cryptoPosts = redditData.data.children
-        .filter(post => {
-          const title = post.data.title.toLowerCase();
-          return title.includes('bitcoin') || title.includes('crypto') || title.includes('ethereum') || title.includes('defi');
-        })
-        .slice(0, 5);
-      
-      console.log('Relevant crypto posts found:');
-      cryptoPosts.forEach((post, i) => {
-        const p = post.data;
-        console.log(`${i+1}. "${p.title}" (${p.ups} upvotes, ${p.num_comments} comments)`);
+      const approveResponse = await fetch(`http://localhost:5000/api/replies/${bestReply.id}/approve`, {
+        method: 'POST'
       });
       
-      // Store real Reddit data
-      for (const post of cryptoPosts) {
-        const p = post.data;
-        await fetch('http://localhost:5000/api/tweets', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            tweetId: `reddit_${p.id}`,
-            text: p.title + (p.selftext ? ` ${p.selftext.substring(0, 200)}` : ''),
-            author: p.author,
-            username: p.author,
-            replyCount: p.num_comments || 0,
-            likes: p.ups || 0,
-            retweets: 0,
-            engagementScore: String(p.ups + p.num_comments),
-            mediaUrls: [],
-            workflowId: 1
-          })
-        });
+      if (approveResponse.ok) {
+        console.log('Reply approved and ready for Twitter API posting');
       }
     }
-  } catch (error) {
-    console.error('Reddit scraping failed:', error.message);
+  } else {
+    console.log('\nNo replies generated. This could be due to:');
+    console.log('- No tweets found with 20+ replies in the scraped data');
+    console.log('- OpenAI quota exceeded (system uses fallback reply generation)');
+    console.log('- Rate limiting from target platforms');
   }
-
-  // Test Twitter web scraping approach
-  try {
-    console.log('\nTesting Twitter web scraping...');
-    const twitterSearchUrl = 'https://mobile.twitter.com/search?q=bitcoin&src=typed_query&f=live';
-    
-    const twitterResponse = await fetch(twitterSearchUrl, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0 Mobile/15E148 Safari/604.1',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.5'
-      }
-    });
-    
-    if (twitterResponse.ok) {
-      const html = await twitterResponse.text();
-      console.log(`Twitter response received (${html.length} characters)`);
-      
-      // Look for common Twitter patterns in HTML
-      const hasTweets = html.includes('tweet') || html.includes('timeline') || html.includes('status');
-      console.log(`Twitter content detected: ${hasTweets}`);
-    }
-  } catch (error) {
-    console.error('Twitter scraping test failed:', error.message);
-  }
-
-  // Check final metrics
-  setTimeout(async () => {
-    try {
-      const metrics = await fetch('http://localhost:5000/api/metrics');
-      const data = await metrics.json();
-      console.log('\nFinal metrics after real scraping:');
-      console.log(`- Tweets processed: ${data.tweetsProcessed}`);
-      console.log(`- AI responses: ${data.aiResponses}`);
-      
-      const activities = await fetch('http://localhost:5000/api/activities');
-      const activityData = await activities.json();
-      console.log(`- Activities logged: ${activityData.length}`);
-    } catch (error) {
-      console.error('Failed to get final metrics:', error.message);
-    }
-  }, 3000);
+  
+  // Check recent activities
+  const activitiesResponse = await fetch('http://localhost:5000/api/activities');
+  const activities = await activitiesResponse.json();
+  
+  console.log('\nRecent System Activities:');
+  activities.slice(0, 5).forEach((activity, i) => {
+    console.log(`${i+1}. ${activity.type}: ${activity.message}`);
+  });
+  
+  // Final system status
+  console.log('\nSystem Status:');
+  console.log(`- Active workflows: ${metrics.activeWorkflows}`);
+  console.log(`- Proxy success rate: ${metrics.proxySuccessRate}%`);
+  console.log(`- Total system health: ${metrics.proxySuccessRate > 50 ? 'GOOD' : 'NEEDS ATTENTION'}`);
+  
+  console.log('\nNext Steps:');
+  console.log('1. Add Twitter API credentials to enable automatic posting');
+  console.log('2. Monitor reply queue for approval/rejection');
+  console.log('3. Adjust targeting criteria based on results');
+  console.log('4. Scale up with more proxy endpoints if needed');
 }
 
 testRealScraping();
