@@ -171,9 +171,9 @@ export class RealDataScraper {
   }
 
   async executeRealWorkflow(searchTerms: string[], minReplies: number = 20): Promise<void> {
-    console.log('Starting real data collection workflow...');
+    console.log('Starting Reddit trend discovery workflow...');
     
-    // Get trending keywords for targeting
+    // Get trending keywords from Reddit cryptocurrency discussions
     const { trendingKeywordFinder } = await import("./trending-keywords");
     const trendingKeywords = await trendingKeywordFinder.getTopKeywordsForScraping(8);
     
@@ -181,37 +181,26 @@ export class RealDataScraper {
     const allTerms = Array.from(new Set([...searchTerms, ...trendingKeywords]));
     
     await storage.logActivity({
-      type: "real_scraping_started",
-      message: `Starting real data collection for: ${allTerms.join(', ')}`,
+      type: "reddit_trend_discovery_started",
+      message: `Discovering trending topics from Reddit: ${allTerms.join(', ')}`,
       status: "success",
       workflowId: 1
     });
 
-    // Collect real data
-    const realTweets = await this.scrapeRealData(allTerms, minReplies);
+    // Collect trending topics from Reddit (for trend analysis, not for posting replies)
+    const redditTrends = await this.scrapeRealData(allTerms, minReplies);
     
-    if (realTweets.length > 0) {
-      console.log(`Processing ${realTweets.length} real posts with ${minReplies}+ replies`);
-      
-      // Generate follower-attracting replies
-      await this.generateFollowerReplies(realTweets);
-      
-      await storage.logActivity({
-        type: "real_scraping_completed",
-        message: `Processed ${realTweets.length} real posts, generated replies for high-engagement content`,
-        status: "success",
-        workflowId: 1
-      });
-    } else {
-      console.log('No posts found meeting engagement criteria');
-      
-      await storage.logActivity({
-        type: "real_scraping_completed",
-        message: `No posts found with ${minReplies}+ replies for search terms`,
-        status: "warning",
-        workflowId: 1
-      });
-    }
+    await storage.logActivity({
+      type: "reddit_trends_discovered",
+      message: `Found ${redditTrends.length} trending discussions on Reddit`,
+      status: "success",
+      workflowId: 1,
+      metadata: { trendsFound: redditTrends.length, keywords: allTerms }
+    });
+
+    // Now find Twitter posts about these trending topics
+    const { twitterPostFinder } = await import("./twitter-post-finder");
+    await twitterPostFinder.executeTwitterWorkflow(allTerms, minReplies);
   }
 
   private cleanText(text: string): string {
