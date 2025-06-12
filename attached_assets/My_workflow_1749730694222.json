@@ -1,0 +1,531 @@
+{
+  "name": "My workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "sheetId": "17euEJulkBVjD7kylKPwefnEKwTTGC5iLT4BHg5TJiXQ",
+        "options": {}
+      },
+      "name": "FetchSettings",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 2,
+      "position": [
+        -2680,
+        100
+      ],
+      "id": "1559758b-929c-4d3e-8b52-fadf75ded885"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "=={{ $node[\"ParseTweetsCode\"].json[\"reply_count\"] }}",
+              "operation": "equal",
+              "value2": 5
+            },
+            {
+              "value1": "=={{ $node[\"ParseTweetsCode\"].json[\"createdAt\"] }}",
+              "value2": "={{ $now.minus({ days: 2 }).toISO() }}"
+            }
+          ]
+        }
+      },
+      "name": "FilterTweets",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        -1700,
+        100
+      ],
+      "id": "731085b6-5ec0-4460-96ec-0d51b563f1fa"
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "sheetId": "17euEJulkBVjD7kylKPwefnEKwTTGC5iLT4BHg5TJiXQ",
+        "options": {}
+      },
+      "name": "CheckProcessedTweets",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 2,
+      "position": [
+        -880,
+        100
+      ],
+      "id": "4acda727-dc68-4a11-b57b-86d60c3e33ad"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {}
+          ]
+        }
+      },
+      "name": "ExcludeProcessed",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        -660,
+        100
+      ],
+      "id": "47efa8a8-e0c1-41e7-84cd-8a52deff6ffc"
+    },
+    {
+      "parameters": {
+        "jsCode": "const tweets = $node['ExcludeProcessed'].json;\nconst scoredTweets = tweets.map(tweet => ({\n  ...tweet,\n  engagementScore: tweet.reply_count + tweet.likes + tweet.retweets\n}));\nconst sortedTweets = scoredTweets.sort((a, b) => b.engagementScore - a.engagementScore);\nconst highEngagement = sortedTweets.filter(t => t.reply_count > 50 || t.likes + t.retweets > 100).slice(0, 2);\nconst moderateEngagement = sortedTweets.filter(t => t.reply_count >= 5 && t.reply_count <= 50 && t.likes + t.retweets >= 10 && t.likes + t.retweets <= 100).slice(0, 3);\nreturn [...highEngagement, ...moderateEngagement].slice(0, 5);"
+      },
+      "name": "SelectEngagementMix",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -440,
+        100
+      ],
+      "id": "7e3494a8-44f5-4099-9381-5f18dfde6ee1"
+    },
+    {
+      "parameters": {},
+      "name": "RouteImageReplies",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 1,
+      "position": [
+        -220,
+        100
+      ],
+      "id": "f52ac9e5-5ea1-4d06-a31f-e58313cc68a0"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://openrouter.ai/api/v1/chat/completions",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"model\": \"mistral-small-3.1\", \"messages\": [{\"role\": \"system\", \"content\": \"You are a witty, crypto-community-oriented AI. Generate a short (<100 chars), engaging, politically neutral reply to: '{{$node['SelectEngagementMix'].json['text']}}' from {{$node['SelectEngagementMix'].json['author']}}. Use crypto slang (e.g., HODL, to the moon). For image replies, suggest a funny, crypto-themed meme (e.g., Doge saying 'Wow, much gains,' Wojak crying 'Missed the dip,' Pepe HODLing, Shiba Inu on a rocket).\"}, {\"role\": \"user\", \"content\": \"{{$node['SelectEngagementMix'].json['text']}}\"}]}",
+        "options": {}
+      },
+      "name": "GenerateReply",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        0,
+        0
+      ],
+      "id": "12b89a99-3d20-4257-91a1-2b95220e8b2b"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api-inference.huggingface.co/models/stabilityai/stable-diffusion-2",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"inputs\": \"{{$node['GenerateReply'].json['memeSuggestion']}}\"}",
+        "options": {}
+      },
+      "name": "GenerateMeme",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        0,
+        200
+      ],
+      "id": "e1b3705e-8232-4f52-ada5-495b7c043662"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://upload.twitter.com/1.1/media/upload.json",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "twitterOAuth1Api",
+        "sendBody": true,
+        "specifyBody": "form-data",
+        "options": {}
+      },
+      "name": "UploadImage",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        220,
+        200
+      ],
+      "id": "ac2a123d-cd48-45e3-95a3-70f98be5bd2a"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.twitter.com/2/tweets",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{{ $node['RouteImageReplies'].output === 'image' ? { 'text': $node['GenerateReply'].json['replyText'], 'media': { 'media_ids': [$node['UploadImage'].json['media_id']] }, 'reply': { 'in_reply_to_tweet_id': $node['SelectEngagementMix'].json['id'] } } : { 'text': $node['GenerateReply'].json['replyText'], 'reply': { 'in_reply_to_tweet_id': $node['SelectEngagementMix'].json['id'] } } }}",
+        "options": {}
+      },
+      "name": "PostReply",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        440,
+        100
+      ],
+      "id": "cb02d4a3-0e1f-4a27-8e6f-8ccadf204e74"
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "operation": "append",
+        "sheetId": "17euEJulkBVjD7kylKPwefnEKwTTGC5iLT4BHg5TJiXQ",
+        "options": {}
+      },
+      "name": "LogReply",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 2,
+      "position": [
+        660,
+        100
+      ],
+      "id": "4c6fcbe0-0cf4-4611-897b-4eefbf28c1d6"
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "operation": "append",
+        "sheetId": "17euEJulkBVjD7kylKPwefnEKwTTGC5iLT4BHg5TJiXQ",
+        "options": {}
+      },
+      "name": "StoreProcessedTweets",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 2,
+      "position": [
+        880,
+        100
+      ],
+      "id": "645d49ef-8116-4de4-ba76-728e934fd682"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 40
+            }
+          ]
+        }
+      },
+      "name": "TriggerEvery40Minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [
+        -2860,
+        100
+      ],
+      "id": "19156bd5-c65c-4811-965c-5074a86f86b1"
+    },
+    {
+      "parameters": {
+        "amount": 20
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        -2160,
+        100
+      ],
+      "id": "df638b61-fc33-41b3-bc72-3d757863a009",
+      "name": "WaitForTweetRun",
+      "webhookId": "66dd9fbc-e52e-4333-8dc4-c3af88aed36f"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "486e4f44-cf8e-4988-8277-5b759e02e121",
+              "name": "rawData",
+              "value": "=={{ $node[\"ParseTweetsCode\"].json }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -1960,
+        100
+      ],
+      "id": "ddc5a9dc-bbf4-4cef-92f8-0ab6446eb087",
+      "name": "LogTweetData"
+    },
+    {
+      "parameters": {
+        "command": "=python /usr/src/app/scrape_tweets.py ={{ JSON.stringify({ \"searchTerms\": [\"GM\", \"crypto\", \"dyor\", \"HODL\", \"to the moon\", \"DeFi\", \"NFT\", \"bullish\", \"bearish\", \"altcoin\", \"Bitcoin\", \"Ethereum\", \"Dogecoin\", \"Web3\", \"yield farming\", \"shilling\"], \"maxItems\": 5, \"tweetLanguage\": \"en\" }) }}"
+      },
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        -2520,
+        100
+      ],
+      "id": "41f17c98-6042-4db5-85b3-0da5127ad151",
+      "name": "ScrapeTweetsTwikit",
+      "alwaysOutputData": false
+    },
+    {
+      "parameters": {
+        "jsCode": "// This node expects raw string output from the previous Execute Command node\n// The output is a JSON array of tweets\ntry {\n  const rawJsonString = $node[\"ScrapeTweetsTwikit\"].stdout;\n  const parsedJson = JSON.parse(rawJsonString);\n\n  // Return an array of items, where each item is a tweet object\n  // n8n expects an array of objects for its next nodes\n  return parsedJson.map(tweet => ({ json: tweet }));\n\n} catch (error) {\n  // Log the error and the problematic raw string for debugging\n  console.error(\"Error parsing JSON from ScrapeTweetsTwikit:\", error.message);\n  console.error(\"Raw string received:\", $node[\"ScrapeTweetsTwikit\"].stdout);\n  throw new Error(\"Failed to parse JSON output from twikit scraper.\");\n}"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2340,
+        100
+      ],
+      "id": "a935d118-4469-49a3-aebd-cad0d979e39f",
+      "name": "ParseTweetsCode"
+    }
+  ],
+  "pinData": {
+    "TriggerEvery40Minutes": [
+      {
+        "json": {
+          "timestamp": "2025-05-28T05:04:00.972-04:00",
+          "Readable date": "May 28th 2025, 5:04:00 am",
+          "Readable time": "5:04:00 am",
+          "Day of week": "Wednesday",
+          "Year": "2025",
+          "Month": "May",
+          "Day of month": "28",
+          "Hour": "05",
+          "Minute": "04",
+          "Second": "00",
+          "Timezone": "America/New_York (UTC-04:00)"
+        }
+      }
+    ],
+    "SelectEngagementMix": [
+      {
+        "json": {
+          "name": "First item",
+          "code": 1
+        }
+      },
+      {
+        "json": {
+          "name": "Second item",
+          "code": 2
+        }
+      }
+    ]
+  },
+  "connections": {
+    "FetchSettings": {
+      "main": [
+        [
+          {
+            "node": "ScrapeTweetsTwikit",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "FilterTweets": {
+      "main": [
+        [
+          {
+            "node": "CheckProcessedTweets",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "CheckProcessedTweets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CheckProcessedTweets": {
+      "main": [
+        [
+          {
+            "node": "ExcludeProcessed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ExcludeProcessed": {
+      "main": [
+        [
+          {
+            "node": "SelectEngagementMix",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SelectEngagementMix": {
+      "main": [
+        [
+          {
+            "node": "RouteImageReplies",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RouteImageReplies": {
+      "main": [
+        [
+          {
+            "node": "GenerateReply",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "GenerateMeme",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GenerateReply": {
+      "main": [
+        [
+          {
+            "node": "PostReply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GenerateMeme": {
+      "main": [
+        [
+          {
+            "node": "UploadImage",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "UploadImage": {
+      "main": [
+        [
+          {
+            "node": "PostReply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PostReply": {
+      "main": [
+        [
+          {
+            "node": "LogReply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LogReply": {
+      "main": [
+        [
+          {
+            "node": "StoreProcessedTweets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "TriggerEvery40Minutes": {
+      "main": [
+        [
+          {
+            "node": "FetchSettings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "WaitForTweetRun": {
+      "main": [
+        [
+          {
+            "node": "LogTweetData",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LogTweetData": {
+      "main": [
+        [
+          {
+            "node": "FilterTweets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ScrapeTweetsTwikit": {
+      "main": [
+        [
+          {
+            "node": "ParseTweetsCode",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ParseTweetsCode": {
+      "main": [
+        [
+          {
+            "node": "WaitForTweetRun",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "8684c6bc-c1e4-459b-99f3-9cb2bf32f54b",
+  "meta": {
+    "instanceId": "bade0acd8fe82b71b07c2f3aa43569e8e6a8928d0ba8e263f684ca7baebd50cc"
+  },
+  "id": "xKqFUb279yAR5l6H",
+  "tags": []
+}
