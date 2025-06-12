@@ -69,7 +69,7 @@ export default function ProxyStatus({ proxyStats }: ProxyStatusProps) {
             <p className="text-xs text-gray-600 dark:text-gray-400">Success Rate</p>
           </div>
           <div className="text-center p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-            <p className="text-2xl font-bold text-blue-600">{stats.avgSpeed}ms</p>
+            <p className="text-2xl font-bold text-blue-600">{Math.round(stats.avgSpeed)}ms</p>
             <p className="text-xs text-gray-600 dark:text-gray-400">Avg Speed</p>
           </div>
         </div>
