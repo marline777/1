@@ -1,6 +1,8 @@
 import { storage } from "./storage";
 import { proxyManager } from "./proxy-manager";
 import { modernScraper, ScrapingTarget } from "./scraping/modern-scraper";
+import { trendingKeywordFinder } from "./trending-keywords";
+import { twitterPostFinder } from "./twitter-post-finder";
 
 export class WorkflowManager {
   private activeWorkflows = new Map<number, NodeJS.Timeout>();
@@ -23,15 +25,15 @@ export class WorkflowManager {
       this.workflowConfigs.set(workflowId, config);
 
       // Set up workflow execution based on type
-      if (workflow.name.includes("Tweet") || workflow.name.includes("Crypto") || workflow.name.includes("Twitter")) {
+      if (workflow.name.includes("Crypto") || workflow.name.includes("Reddit")) {
+        this.startCompleteWorkflow(workflowId, config);
+      } else if (workflow.name.includes("Tweet") || workflow.name.includes("Twitter")) {
         this.startScrapingWorkflow(workflowId, config, "twitter");
-      } else if (workflow.name.includes("Reddit")) {
-        this.startScrapingWorkflow(workflowId, config, "reddit");
       } else if (workflow.name.includes("Discord")) {
         this.startScrapingWorkflow(workflowId, config, "discord");
       } else {
-        // Default to Twitter scraping for crypto terms
-        this.startScrapingWorkflow(workflowId, config, "twitter");
+        // Default to complete Reddit → Twitter workflow
+        this.startCompleteWorkflow(workflowId, config);
       }
 
       await storage.updateWorkflowStatus(workflowId, "active");
@@ -122,7 +124,55 @@ export class WorkflowManager {
     this.activeWorkflows.set(workflowId, timer);
   }
 
+  private startCompleteWorkflow(workflowId: number, config: any) {
+    const interval = config.interval || 30 * 60 * 1000; // 30 minutes default
 
+    const timer = setInterval(async () => {
+      try {
+        // Step 1: Get trending crypto keywords from Reddit/CoinGecko
+        const trendingKeywords = await trendingKeywordFinder.getTopKeywordsForScraping(5);
+        
+        if (trendingKeywords.length > 0) {
+          await storage.logActivity({
+            type: "trending_keywords_found",
+            message: `Found ${trendingKeywords.length} trending crypto keywords`,
+            status: "success",
+            workflowId: workflowId,
+            metadata: { 
+              sources: ["coingecko_trending", "price_gainers", "crypto_culture"],
+              keywordCount: trendingKeywords.length
+            }
+          });
+
+          // Step 2: Execute complete Reddit → Twitter → AI replies workflow
+          await twitterPostFinder.executeTwitterWorkflow(trendingKeywords, 5);
+        }
+
+      } catch (error) {
+        console.error(`Complete workflow error for workflow ${workflowId}:`, error);
+        await storage.logActivity({
+          type: "workflow_error",
+          message: `Complete workflow failed: ${(error as Error).message}`,
+          status: "error",
+          workflowId: workflowId
+        });
+      }
+    }, interval);
+
+    // Execute immediately on start
+    setTimeout(async () => {
+      try {
+        const trendingKeywords = await trendingKeywordFinder.getTopKeywordsForScraping(5);
+        if (trendingKeywords.length > 0) {
+          await twitterPostFinder.executeTwitterWorkflow(trendingKeywords, 5);
+        }
+      } catch (error) {
+        console.error('Initial workflow execution failed:', error);
+      }
+    }, 5000);
+
+    this.activeWorkflows.set(workflowId, timer);
+  }
 }
 
 export const workflowManager = new WorkflowManager();
