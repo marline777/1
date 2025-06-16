@@ -35,7 +35,7 @@ export default function Sidebar() {
             <li key={item.label}>
               <Link
                 href={item.href}
-                className={`flex items-center space-x-3 px-4 py-3 rounded-lg font-medium transition-colors ${
+                className={`flex items-center space-x-3 px-4 py-3 rounded-lg font-medium transition-colors cursor-pointer ${
                   location === item.href
                     ? "bg-primary/10 text-primary"
                     : "text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
