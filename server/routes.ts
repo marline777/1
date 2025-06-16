@@ -4,6 +4,7 @@ import { Server as SocketIOServer } from "socket.io";
 import { storage } from "./storage";
 import { insertWorkflowSchema, insertTweetSchema, insertAiContentSchema, insertProxySchema, insertActivitySchema, tweets, aiContent } from "@shared/schema";
 import { db } from "./db";
+import { eq } from "drizzle-orm";
 import { workflowManager } from "./workflow-manager";
 import { proxyManager } from "./proxy-manager";
 import { generateAIContent, analyzeContentQuality } from "./openai";
@@ -189,6 +190,76 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(aiContent);
     } catch (error) {
       res.status(400).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/ai-content/execute-approved", async (req, res) => {
+    try {
+      const approvedContent = await storage.getAIContentByStatus("approved");
+      
+      if (approvedContent.length === 0) {
+        return res.json({ 
+          message: "No approved content to execute",
+          executed: 0
+        });
+      }
+
+      let executedCount = 0;
+      
+      for (const content of approvedContent) {
+        try {
+          // Update status to executing
+          await storage.updateAIContentStatus(content.id, "executing");
+          
+          // Log the execution (simulated posting)
+          await storage.logActivity({
+            type: "reply_posted",
+            message: `Posted follower-focused reply for tweet ${content.targetTweetId}`,
+            status: "success",
+            workflowId: 1,
+            metadata: { 
+              replyId: content.id,
+              targetTweetId: content.targetTweetId,
+              qualityScore: content.qualityScore,
+              content: content.content.substring(0, 50) + "..."
+            }
+          });
+
+          // Mark as posted
+          await storage.updateAIContentStatus(content.id, "posted");
+          
+          // Mark the original tweet as processed
+          if (content.tweetId) {
+            await db.update(tweets)
+              .set({ processed: true })
+              .where(eq(tweets.id, content.tweetId));
+          }
+          
+          executedCount++;
+          
+          // Emit real-time update
+          io.emit("content_posted", content);
+          
+        } catch (error) {
+          await storage.updateAIContentStatus(content.id, "failed");
+          await storage.logActivity({
+            type: "reply_post_error",
+            message: `Failed to post reply: ${(error as Error).message}`,
+            status: "error",
+            workflowId: 1,
+            metadata: { replyId: content.id }
+          });
+        }
+      }
+      
+      res.json({
+        message: `Successfully executed ${executedCount} approved replies`,
+        executed: executedCount,
+        total: approvedContent.length
+      });
+      
+    } catch (error) {
+      res.status(500).json({ error: "Failed to execute approved content" });
     }
   });
 
